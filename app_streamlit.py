@@ -24,7 +24,7 @@ st.set_page_config(
 
 BASE_DIR = Path(__file__).parent
 
-# Detecta automáticamente si la carpeta está con guiones bajos o con espacios
+# Detecta automáticamente si la carpeta está con guiones bajos o espacios
 if (BASE_DIR / "resultados_modelo_rotacion").exists():
     RESULTS_DIR = BASE_DIR / "resultados_modelo_rotacion"
 else:
@@ -88,43 +88,36 @@ def predecir_probabilidad(df_input):
     return modelo.predict_proba(X_scaled)[:, 1]
 
 
+def clasificar_estado(probabilidad_pct):
+    if probabilidad_pct >= 55:
+        return "🔴 Riesgo extremo"
+    elif probabilidad_pct >= 35:
+        return "🟡 Requiere seguimiento"
+    else:
+        return "🟢 Sin alerta"
+
+
 def calcular_riesgo_dataset(df_base):
     df_pred = df_base.copy()
     df_pred["probabilidad_rotacion"] = predecir_probabilidad(df_pred)
     df_pred["probabilidad_%"] = df_pred["probabilidad_rotacion"] * 100
-    df_pred["prioridad"] = df_pred["probabilidad_%"].apply(clasificar_prioridad)
+    df_pred["estado"] = df_pred["probabilidad_%"].apply(clasificar_estado)
     return df_pred
 
 
-# ============================================================
-# FUNCIONES DE LECTURA PARA RRHH
-# ============================================================
+def resumen_estados(df_pred):
+    total = len(df_pred)
 
-def clasificar_prioridad(probabilidad_pct):
-    if probabilidad_pct >= 55:
-        return "🔴 Revisar primero"
-    elif probabilidad_pct >= 35:
-        return "🟡 Revisar contexto"
-    else:
-        return "🟢 Seguimiento ordinario"
+    extremos = int((df_pred["estado"] == "🔴 Riesgo extremo").sum())
+    seguimiento = int((df_pred["estado"] == "🟡 Requiere seguimiento").sum())
+    sin_alerta = int((df_pred["estado"] == "🟢 Sin alerta").sum())
 
-
-def color_prioridad(prioridad):
-    if "🔴" in prioridad:
-        return "#D9534F"
-    elif "🟡" in prioridad:
-        return "#F2B705"
-    else:
-        return "#4CAF50"
-
-
-def lectura_prioridad(prioridad):
-    if "🔴" in prioridad:
-        return "Este colectivo debería revisarse de forma prioritaria."
-    elif "🟡" in prioridad:
-        return "Este colectivo no requiere alarma, pero sí seguimiento y revisión de contexto."
-    else:
-        return "Este colectivo no muestra una señal agregada alta según el modelo."
+    return {
+        "total": total,
+        "extremos": extremos,
+        "seguimiento": seguimiento,
+        "sin_alerta": sin_alerta
+    }
 
 
 def mejor_posicionamiento_salarial():
@@ -147,152 +140,69 @@ def resumen_por_colectivo(df_pred, variable):
         .groupby(variable)
         .agg(
             empleados=(variable, "count"),
-            riesgo_medio=("probabilidad_%", "mean"),
-            riesgo_alto=("prioridad", lambda x: x.astype(str).str.contains("🔴").sum()),
-            riesgo_medio_n=("prioridad", lambda x: x.astype(str).str.contains("🟡").sum()),
-            riesgo_bajo=("prioridad", lambda x: x.astype(str).str.contains("🟢").sum())
+            riesgo_extremo=("estado", lambda x: (x == "🔴 Riesgo extremo").sum()),
+            seguimiento=("estado", lambda x: (x == "🟡 Requiere seguimiento").sum()),
+            sin_alerta=("estado", lambda x: (x == "🟢 Sin alerta").sum())
         )
         .reset_index()
     )
 
-    resumen["pct_revisar"] = (
-        (resumen["riesgo_alto"] + resumen["riesgo_medio_n"]) /
-        resumen["empleados"] * 100
+    resumen["casos_a_revisar"] = resumen["riesgo_extremo"] + resumen["seguimiento"]
+
+    resumen["% a revisar"] = (
+        resumen["casos_a_revisar"] / resumen["empleados"] * 100
     )
 
-    resumen["prioridad"] = resumen["riesgo_medio"].apply(clasificar_prioridad)
-    resumen["lectura_RRHH"] = resumen["prioridad"].apply(lectura_prioridad)
-
-    resumen = resumen.sort_values("riesgo_medio", ascending=False)
+    resumen = resumen.sort_values(
+        ["riesgo_extremo", "seguimiento", "% a revisar"],
+        ascending=False
+    )
 
     return resumen
 
 
-def explicar_puntos_dolor(df_segmento, df_total):
-    puntos = []
+def aplicar_simulacion(df_segmento, simulacion):
+    df_sim = df_segmento.copy()
 
-    # Movilidad funcional
-    if "movilidad_funcional_sn" in df_segmento.columns:
-        pct_sin_mov = (df_segmento["movilidad_funcional_sn"].astype(str) == "No").mean() * 100
+    if simulacion == "Movilidad funcional = Sí":
+        df_sim["movilidad_funcional_sn"] = "Sí"
 
-        if pct_sin_mov >= 50:
-            puntos.append({
-                "Variable": "Movilidad funcional",
-                "Lectura": "Gran parte del colectivo no tiene movilidad funcional registrada.",
-                "Qué revisar desde RRHH": "Oportunidades de movilidad interna, cambio de proyecto, promoción o desarrollo profesional."
-            })
+    elif simulacion == "Posicionamiento salarial más favorable":
+        df_sim["posicionamiento_salarial"] = mejor_posicionamiento_salarial()
 
-    # Posicionamiento salarial
-    if "posicionamiento_salarial" in df_segmento.columns:
-        texto_salario = df_segmento["posicionamiento_salarial"].astype(str)
+    elif simulacion == "Movilidad + salario":
+        df_sim["movilidad_funcional_sn"] = "Sí"
+        df_sim["posicionamiento_salarial"] = mejor_posicionamiento_salarial()
 
-        pct_salario_bajo = (
-            texto_salario.str.contains("Por debajo", case=False, na=False) |
-            texto_salario.str.contains("mínimo", case=False, na=False) |
-            texto_salario.str.contains("minimo", case=False, na=False)
-        ).mean() * 100
-
-        if pct_salario_bajo >= 40:
-            puntos.append({
-                "Variable": "Posicionamiento salarial",
-                "Lectura": "Una parte relevante del colectivo está en posiciones salariales bajas o medio-bajas.",
-                "Qué revisar desde RRHH": "Equidad interna, competitividad salarial y evolución dentro de la banda."
-            })
-
-    # Antigüedad
-    if "antiguedad_anios" in df_segmento.columns:
-        antig_segmento = df_segmento["antiguedad_anios"].mean()
-        antig_total = df_total["antiguedad_anios"].mean()
-
-        if antig_segmento < antig_total:
-            puntos.append({
-                "Variable": "Antigüedad",
-                "Lectura": "El colectivo tiene una antigüedad media inferior a la media de la muestra.",
-                "Qué revisar desde RRHH": "Onboarding extendido, seguimiento de expectativas, carrera temprana y vinculación con el proyecto."
-            })
-
-    # Evaluación global
-    if "evaluacion_global" in df_segmento.columns:
-        evaluacion_mas_frecuente = df_segmento["evaluacion_global"].astype(str).mode()
-
-        if len(evaluacion_mas_frecuente) > 0:
-            puntos.append({
-                "Variable": "Evaluación global",
-                "Lectura": f"La evaluación más frecuente en el colectivo es: {evaluacion_mas_frecuente.iloc[0]}.",
-                "Qué revisar desde RRHH": "Usar la evaluación como información complementaria, no como explicación única del riesgo."
-            })
-
-    if not puntos:
-        puntos.append({
-            "Variable": "Contexto organizativo",
-            "Lectura": "No aparece un único punto de dolor claramente dominante con las variables disponibles.",
-            "Qué revisar desde RRHH": "Complementar el análisis con información cualitativa del área, responsables y entrevistas internas."
-        })
-
-    return pd.DataFrame(puntos)
+    return df_sim
 
 
-def simular_escenarios(df_segmento):
-    escenarios = []
+def tabla_comparacion(actual, simulado):
+    actual_res = resumen_estados(actual)
+    sim_res = resumen_estados(simulado)
 
-    # Situación actual
-    actual = calcular_riesgo_dataset(df_segmento)
-    riesgo_actual = actual["probabilidad_%"].mean()
-    prioridad_actual = clasificar_prioridad(riesgo_actual)
+    datos = pd.DataFrame([
+        {
+            "Estado": "🔴 Riesgo extremo",
+            "Situación actual": actual_res["extremos"],
+            "Tras modificar la variable": sim_res["extremos"],
+            "Diferencia": sim_res["extremos"] - actual_res["extremos"]
+        },
+        {
+            "Estado": "🟡 Requiere seguimiento",
+            "Situación actual": actual_res["seguimiento"],
+            "Tras modificar la variable": sim_res["seguimiento"],
+            "Diferencia": sim_res["seguimiento"] - actual_res["seguimiento"]
+        },
+        {
+            "Estado": "🟢 Sin alerta",
+            "Situación actual": actual_res["sin_alerta"],
+            "Tras modificar la variable": sim_res["sin_alerta"],
+            "Diferencia": sim_res["sin_alerta"] - actual_res["sin_alerta"]
+        }
+    ])
 
-    escenarios.append({
-        "Escenario": "Situación actual",
-        "Prioridad estimada": prioridad_actual,
-        "Riesgo medio": riesgo_actual,
-        "Lectura para RRHH": "Punto de partida"
-    })
-
-    # Movilidad funcional
-    sim_mov = df_segmento.copy()
-    sim_mov["movilidad_funcional_sn"] = "Sí"
-    sim_mov = calcular_riesgo_dataset(sim_mov)
-    riesgo_mov = sim_mov["probabilidad_%"].mean()
-
-    escenarios.append({
-        "Escenario": "Ofrecer movilidad interna",
-        "Prioridad estimada": clasificar_prioridad(riesgo_mov),
-        "Riesgo medio": riesgo_mov,
-        "Lectura para RRHH": "Revisar movilidad, cambio de proyecto o desarrollo interno"
-    })
-
-    # Revisión salarial
-    sim_sal = df_segmento.copy()
-    sim_sal["posicionamiento_salarial"] = mejor_posicionamiento_salarial()
-    sim_sal = calcular_riesgo_dataset(sim_sal)
-    riesgo_sal = sim_sal["probabilidad_%"].mean()
-
-    escenarios.append({
-        "Escenario": "Revisar posicionamiento salarial",
-        "Prioridad estimada": clasificar_prioridad(riesgo_sal),
-        "Riesgo medio": riesgo_sal,
-        "Lectura para RRHH": "Revisar equidad interna y competitividad salarial"
-    })
-
-    # Combinación
-    sim_comb = df_segmento.copy()
-    sim_comb["movilidad_funcional_sn"] = "Sí"
-    sim_comb["posicionamiento_salarial"] = mejor_posicionamiento_salarial()
-    sim_comb = calcular_riesgo_dataset(sim_comb)
-    riesgo_comb = sim_comb["probabilidad_%"].mean()
-
-    escenarios.append({
-        "Escenario": "Movilidad + revisión salarial",
-        "Prioridad estimada": clasificar_prioridad(riesgo_comb),
-        "Riesgo medio": riesgo_comb,
-        "Lectura para RRHH": "Combinar desarrollo interno y revisión salarial"
-    })
-
-    escenarios_df = pd.DataFrame(escenarios)
-    escenarios_df["Cambio respecto a situación actual"] = (
-        escenarios_df["Riesgo medio"] - riesgo_actual
-    )
-
-    return escenarios_df
+    return datos
 
 
 # ============================================================
@@ -300,6 +210,7 @@ def simular_escenarios(df_segmento):
 # ============================================================
 
 df_pred = calcular_riesgo_dataset(df)
+resumen_global = resumen_estados(df_pred)
 
 
 # ============================================================
@@ -309,13 +220,14 @@ df_pred = calcular_riesgo_dataset(df)
 st.title("App de apoyo a RRHH: rotación voluntaria")
 
 st.write(
-    "Esta herramienta ayuda a identificar colectivos con mayor prioridad de revisión, "
-    "entender posibles puntos de dolor y simular acciones de RRHH."
+    "Herramienta sencilla para ver cuántos perfiles están en riesgo extremo, "
+    "cuántos requieren seguimiento y cómo cambiaría la estimación del modelo "
+    "si se modificaran algunas variables organizacionales."
 )
 
 st.warning(
-    "Uso responsable: el modelo no predice con certeza quién se irá. "
-    "Debe utilizarse como apoyo para priorizar análisis, no para tomar decisiones automáticas."
+    "La app no demuestra causalidad ni toma decisiones automáticas. "
+    "Solo muestra cómo cambia la estimación del modelo."
 )
 
 
@@ -323,42 +235,74 @@ st.warning(
 # PESTAÑAS
 # ============================================================
 
-tab1, tab2, tab3, tab4 = st.tabs([
-    "1. Mapa de prioridades",
-    "2. Explicación del riesgo",
-    "3. Simulador de acciones",
-    "4. Consulta individual"
+tab1, tab2, tab3 = st.tabs([
+    "1. Panel general",
+    "2. Colectivos de riesgo",
+    "3. Simulador de variables"
 ])
 
 
 # ============================================================
-# TAB 1 - MAPA DE PRIORIDADES
+# TAB 1 - PANEL GENERAL
 # ============================================================
 
 with tab1:
-    st.subheader("Mapa de prioridades")
+    st.subheader("Panel general")
 
     st.write(
-        "Esta pantalla muestra dónde debería mirar primero RRHH. "
-        "La prioridad se presenta con una escala sencilla de colores."
+        "Resumen de la situación estimada por el modelo para toda la muestra."
     )
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
 
-    col1.metric("Empleados analizados", len(df_pred))
-    col2.metric("Riesgo medio estimado", f"{df_pred['probabilidad_%'].mean():.1f} %")
-    col3.metric(
-        "Perfiles a revisar",
-        f"{df_pred['prioridad'].astype(str).str.contains('🔴|🟡').mean() * 100:.1f} %"
+    col1.metric("Empleados analizados", resumen_global["total"])
+    col2.metric("🔴 Riesgo extremo", resumen_global["extremos"])
+    col3.metric("🟡 Requiere seguimiento", resumen_global["seguimiento"])
+    col4.metric("🟢 Sin alerta", resumen_global["sin_alerta"])
+
+    st.markdown("### Distribución de estados")
+
+    distribucion = pd.DataFrame([
+        {"Estado": "🔴 Riesgo extremo", "Casos": resumen_global["extremos"]},
+        {"Estado": "🟡 Requiere seguimiento", "Casos": resumen_global["seguimiento"]},
+        {"Estado": "🟢 Sin alerta", "Casos": resumen_global["sin_alerta"]}
+    ])
+
+    fig = px.pie(
+        distribucion,
+        names="Estado",
+        values="Casos",
+        hole=0.45,
+        color="Estado",
+        color_discrete_map={
+            "🔴 Riesgo extremo": "#D9534F",
+            "🟡 Requiere seguimiento": "#F2B705",
+            "🟢 Sin alerta": "#4CAF50"
+        },
+        title="Distribución global de perfiles"
     )
 
-    st.markdown(
-        """
-        **Leyenda**
-        - 🟢 **Seguimiento ordinario**: no se observa señal agregada alta.
-        - 🟡 **Revisar contexto**: conviene observar el colectivo y contrastar información.
-        - 🔴 **Revisar primero**: colectivo prioritario para análisis de RRHH.
-        """
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("### Lectura sencilla")
+
+    st.info(
+        f"El modelo clasifica {resumen_global['extremos']} casos como riesgo extremo "
+        f"y {resumen_global['seguimiento']} como casos que requieren seguimiento. "
+        f"Estos grupos son los que conviene observar con mayor detalle en las siguientes pestañas."
+    )
+
+
+# ============================================================
+# TAB 2 - COLECTIVOS DE RIESGO
+# ============================================================
+
+with tab2:
+    st.subheader("Colectivos de riesgo")
+
+    st.write(
+        "Esta pestaña permite ver en qué colectivos se concentran más casos en riesgo extremo "
+        "o que requieren seguimiento."
     )
 
     opciones_agrupacion = [
@@ -384,68 +328,94 @@ with tab1:
     }
 
     variable = st.selectbox(
-        "¿Qué quieres revisar?",
+        "Selecciona qué quieres revisar",
         opciones_agrupacion,
         format_func=lambda x: nombres.get(x, x)
     )
 
     resumen = resumen_por_colectivo(df_pred, variable)
 
+    st.markdown("### Colectivos ordenados por prioridad")
+
     top = resumen.iloc[0]
 
-    st.markdown("### Colectivo prioritario")
+    col1, col2, col3 = st.columns(3)
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Colectivo", str(top[variable]))
-    c2.metric("Prioridad", top["prioridad"])
-    c3.metric("Personas en el colectivo", int(top["empleados"]))
+    col1.metric("Colectivo con más casos extremos", str(top[variable]))
+    col2.metric("Casos en riesgo extremo", int(top["riesgo_extremo"]))
+    col3.metric("Casos a revisar", int(top["casos_a_revisar"]))
 
-    st.info(top["lectura_RRHH"])
+    st.markdown("### Visualización por colectivo")
+
+    resumen_grafico = resumen.melt(
+        id_vars=[variable],
+        value_vars=["riesgo_extremo", "seguimiento", "sin_alerta"],
+        var_name="Estado",
+        value_name="Casos"
+    )
+
+    resumen_grafico["Estado"] = resumen_grafico["Estado"].replace({
+        "riesgo_extremo": "🔴 Riesgo extremo",
+        "seguimiento": "🟡 Requiere seguimiento",
+        "sin_alerta": "🟢 Sin alerta"
+    })
 
     fig = px.bar(
-        resumen.sort_values("riesgo_medio"),
-        x="riesgo_medio",
+        resumen_grafico,
+        x="Casos",
         y=variable,
+        color="Estado",
         orientation="h",
-        color="prioridad",
         color_discrete_map={
-            "🟢 Seguimiento ordinario": "#4CAF50",
-            "🟡 Revisar contexto": "#F2B705",
-            "🔴 Revisar primero": "#D9534F"
+            "🔴 Riesgo extremo": "#D9534F",
+            "🟡 Requiere seguimiento": "#F2B705",
+            "🟢 Sin alerta": "#4CAF50"
         },
-        text="prioridad",
-        title=f"Prioridad por {nombres.get(variable, variable)}"
+        title=f"Casos por estado según {nombres.get(variable, variable)}"
     )
 
     fig.update_layout(
-        xaxis_title="Riesgo medio estimado (%)",
         yaxis_title="",
-        height=520,
-        legend_title="Prioridad"
+        xaxis_title="Número de casos",
+        height=550,
+        legend_title="Estado"
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
-    tabla = resumen[[variable, "empleados", "prioridad", "lectura_RRHH"]].copy()
+    st.markdown("### Tabla sencilla")
+
+    tabla = resumen[[
+        variable,
+        "empleados",
+        "riesgo_extremo",
+        "seguimiento",
+        "sin_alerta",
+        "casos_a_revisar"
+    ]].copy()
+
     tabla = tabla.rename(columns={
         variable: "Colectivo",
-        "empleados": "Nº empleados",
-        "prioridad": "Prioridad",
-        "lectura_RRHH": "Lectura para RRHH"
+        "empleados": "Total empleados",
+        "riesgo_extremo": "🔴 Riesgo extremo",
+        "seguimiento": "🟡 Seguimiento",
+        "sin_alerta": "🟢 Sin alerta",
+        "casos_a_revisar": "Total a revisar"
     })
 
     st.dataframe(tabla, use_container_width=True)
 
 
 # ============================================================
-# TAB 2 - EXPLICACIÓN DEL RIESGO
+# TAB 3 - SIMULADOR DE VARIABLES
 # ============================================================
 
-with tab2:
-    st.subheader("Explicación del riesgo")
+with tab3:
+    st.subheader("Simulador de variables")
 
     st.write(
-        "Selecciona un colectivo para ver qué variables pueden estar detrás de la prioridad detectada."
+        "Selecciona un colectivo y una variable a modificar. "
+        "La app mostrará cuántos casos cambiarían de estado según la estimación del modelo."
     )
 
     opciones_agrupacion = [
@@ -457,200 +427,114 @@ with tab2:
             "movilidad_funcional_sn",
             "tipo_contrato",
             "tramo_antiguedad"
-        ] if col in df_pred.columns
+        ] if col in df.columns
     ]
 
     col_a, col_b = st.columns(2)
 
     with col_a:
         grupo = st.selectbox(
-            "Variable de análisis",
-            opciones_agrupacion,
-            format_func=lambda x: nombres.get(x, x),
-            key="grupo_explicacion"
-        )
-
-    with col_b:
-        segmento = st.selectbox(
-            "Colectivo",
-            sorted(df_pred[grupo].dropna().astype(str).unique().tolist()),
-            key="segmento_explicacion"
-        )
-
-    df_segmento = df_pred[df_pred[grupo].astype(str) == segmento].copy()
-
-    riesgo_segmento = df_segmento["probabilidad_%"].mean()
-    prioridad_segmento = clasificar_prioridad(riesgo_segmento)
-
-    st.markdown("### Lectura rápida")
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric("Colectivo seleccionado", segmento)
-    col2.metric("Prioridad", prioridad_segmento)
-    col3.metric("Nº empleados", len(df_segmento))
-
-    st.info(lectura_prioridad(prioridad_segmento))
-
-    st.markdown("### Posibles puntos de dolor")
-
-    puntos_dolor = explicar_puntos_dolor(df_segmento, df_pred)
-
-    st.dataframe(puntos_dolor, use_container_width=True)
-
-
-# ============================================================
-# TAB 3 - SIMULADOR DE ACCIONES
-# ============================================================
-
-with tab3:
-    st.subheader("Simulador de acciones")
-
-    st.write(
-        "El simulador muestra cómo cambiaría la prioridad estimada si se modificaran algunas variables. "
-        "No demuestra causalidad; ayuda a explorar posibles líneas de actuación."
-    )
-
-    col_a, col_b = st.columns(2)
-
-    with col_a:
-        grupo_sim = st.selectbox(
-            "Variable de análisis",
+            "Selecciona colectivo",
             opciones_agrupacion,
             format_func=lambda x: nombres.get(x, x),
             key="grupo_simulador"
         )
 
     with col_b:
-        segmento_sim = st.selectbox(
-            "Colectivo",
-            sorted(df_pred[grupo_sim].dropna().astype(str).unique().tolist()),
+        segmento = st.selectbox(
+            "Selecciona segmento",
+            sorted(df[grupo].dropna().astype(str).unique().tolist()),
             key="segmento_simulador"
         )
 
-    df_segmento_sim = df[df[grupo_sim].astype(str) == segmento_sim].copy()
-
-    escenarios_df = simular_escenarios(df_segmento_sim)
-
-    actual = escenarios_df[escenarios_df["Escenario"] == "Situación actual"].iloc[0]
-    mejor = escenarios_df.sort_values("Riesgo medio").iloc[0]
-
-    st.markdown("### Resultado para RRHH")
-
-    col1, col2 = st.columns(2)
-
-    col1.metric("Situación actual", actual["Prioridad estimada"])
-    col2.metric("Mejor escenario estimado", mejor["Prioridad estimada"])
-
-    if mejor["Escenario"] == "Situación actual":
-        st.info(
-            "Según el modelo, ninguna acción simulada reduce claramente la prioridad actual. "
-            "Conviene revisar el caso con información cualitativa."
-        )
-    else:
-        st.success(
-            f"La acción más favorable sería: **{mejor['Escenario']}**."
-        )
-
-        st.write(
-            f"Lectura para RRHH: {mejor['Lectura para RRHH']}."
-        )
-
-    st.markdown("### Comparación sencilla de escenarios")
-
-    fig = px.bar(
-        escenarios_df.sort_values("Riesgo medio"),
-        x="Riesgo medio",
-        y="Escenario",
-        orientation="h",
-        color="Prioridad estimada",
-        color_discrete_map={
-            "🟢 Seguimiento ordinario": "#4CAF50",
-            "🟡 Revisar contexto": "#F2B705",
-            "🔴 Revisar primero": "#D9534F"
-        },
-        text="Prioridad estimada",
-        title="Cómo cambiaría la prioridad según la acción simulada"
+    simulacion = st.selectbox(
+        "Selecciona qué variable quieres modificar",
+        [
+            "Movilidad funcional = Sí",
+            "Posicionamiento salarial más favorable",
+            "Movilidad + salario"
+        ]
     )
 
-    fig.update_layout(
-        xaxis_title="Riesgo medio estimado (%)",
-        yaxis_title="",
-        height=420,
-        legend_title="Prioridad"
+    df_segmento = df[df[grupo].astype(str) == segmento].copy()
+
+    actual = calcular_riesgo_dataset(df_segmento)
+
+    df_modificado = aplicar_simulacion(df_segmento, simulacion)
+    simulado = calcular_riesgo_dataset(df_modificado)
+
+    actual_res = resumen_estados(actual)
+    sim_res = resumen_estados(simulado)
+
+    st.markdown("### Resultado de la simulación")
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric(
+        "🔴 Riesgo extremo",
+        sim_res["extremos"],
+        delta=sim_res["extremos"] - actual_res["extremos"]
+    )
+
+    col2.metric(
+        "🟡 Requiere seguimiento",
+        sim_res["seguimiento"],
+        delta=sim_res["seguimiento"] - actual_res["seguimiento"]
+    )
+
+    col3.metric(
+        "🟢 Sin alerta",
+        sim_res["sin_alerta"],
+        delta=sim_res["sin_alerta"] - actual_res["sin_alerta"]
+    )
+
+    diferencia_extremos = actual_res["extremos"] - sim_res["extremos"]
+    diferencia_revision = (
+        (actual_res["extremos"] + actual_res["seguimiento"]) -
+        (sim_res["extremos"] + sim_res["seguimiento"])
+    )
+
+    if diferencia_extremos > 0:
+        st.success(
+            f"Según el modelo, al modificar esta variable habría {diferencia_extremos} casos menos en riesgo extremo."
+        )
+    elif diferencia_extremos == 0:
+        st.info(
+            "Según el modelo, esta modificación no reduce los casos en riesgo extremo."
+        )
+    else:
+        st.warning(
+            "Según el modelo, esta modificación aumentaría los casos en riesgo extremo."
+        )
+
+    if diferencia_revision > 0:
+        st.info(
+            f"En total, habría {diferencia_revision} casos menos que requerirían revisión."
+        )
+
+    st.markdown("### Comparación antes / después")
+
+    comparacion = tabla_comparacion(actual, simulado)
+
+    fig = px.bar(
+        comparacion.melt(
+            id_vars="Estado",
+            value_vars=["Situación actual", "Tras modificar la variable"],
+            var_name="Escenario",
+            value_name="Casos"
+        ),
+        x="Estado",
+        y="Casos",
+        color="Escenario",
+        barmode="group",
+        title="Comparación de casos antes y después de modificar la variable"
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
-    tabla_escenarios = escenarios_df[[
-        "Escenario",
-        "Prioridad estimada",
-        "Lectura para RRHH"
-    ]].copy()
-
-    st.dataframe(tabla_escenarios, use_container_width=True)
+    st.dataframe(comparacion, use_container_width=True)
 
     st.warning(
-        "Nota: la simulación no prueba que una acción reduzca realmente la rotación. "
-        "Solo muestra cómo cambiaría la estimación del modelo."
+        "Nota: esta simulación no demuestra que la acción cause una reducción real de la rotación. "
+        "Solo muestra cómo cambiaría la clasificación estimada por el modelo."
     )
-
-
-# ============================================================
-# TAB 4 - CONSULTA INDIVIDUAL
-# ============================================================
-
-with tab4:
-    st.subheader("Consulta individual orientativa")
-
-    st.write(
-        "Esta consulta permite probar un perfil concreto. Debe usarse como apoyo, no como etiqueta individual."
-    )
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        antiguedad = st.slider("Antigüedad en años", 0.0, 40.0, 5.0, 0.5)
-
-        posicionamiento = st.selectbox(
-            "Posicionamiento salarial",
-            categorias["posicionamiento_salarial"]
-        )
-
-        evaluacion = st.selectbox(
-            "Evaluación global",
-            categorias["evaluacion_global"]
-        )
-
-        movilidad = st.selectbox(
-            "Movilidad funcional",
-            categorias["movilidad_funcional_sn"]
-        )
-
-        contrato = st.selectbox(
-            "Tipo de contrato",
-            categorias["tipo_contrato"]
-        )
-
-    caso = pd.DataFrame([{
-        "antiguedad_anios": antiguedad,
-        "posicionamiento_salarial": posicionamiento,
-        "evaluacion_global": evaluacion,
-        "movilidad_funcional_sn": movilidad,
-        "tipo_contrato": contrato
-    }])
-
-    prob = float(predecir_probabilidad(caso)[0]) * 100
-    prioridad = clasificar_prioridad(prob)
-
-    with col2:
-        st.metric("Prioridad estimada", prioridad)
-
-        if "🔴" in prioridad:
-            st.warning("Revisar primero: conviene analizar contexto, movilidad y salario.")
-        elif "🟡" in prioridad:
-            st.info("Revisar contexto: conviene realizar seguimiento.")
-        else:
-            st.success("Seguimiento ordinario.")
-
-    st.dataframe(caso, use_container_width=True)
