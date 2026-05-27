@@ -1,0 +1,66 @@
+{
+    "objetivo": "Predicción orientativa de rotación voluntaria en perfiles tecnológicos",
+    "modelo": "Regresión logística",
+    "variables_modelo": [
+        "antiguedad_anios",
+        "posicionamiento_salarial",
+        "evaluacion_global",
+        "movilidad_funcional_sn",
+        "tipo_contrato"
+    ],
+    "columnas_modelo": [
+        "antiguedad_anios",
+        "posicionamiento_salarial_Entre el punto mínimo y el punto medio de la banda",
+        "posicionamiento_salarial_Por debajo del mínimo de la banda",
+        "posicionamiento_salarial_Por encima del máximo de la banda",
+        "evaluacion_global_2",
+        "evaluacion_global_3",
+        "evaluacion_global_4",
+        "evaluacion_global_5",
+        "evaluacion_global_Sin Evaluación",
+        "movilidad_funcional_sn_Sí",
+        "tipo_contrato_Temporal"
+    ],
+    "metricas": {
+        "Accuracy": 0.5909090909090909,
+        "Precisión": 0.06521739130434782,
+        "Sensibilidad / Recall": 0.6,
+        "Especificidad": 0.5904761904761905,
+        "F1-score": 0.11764705882352941,
+        "AUC ROC": 0.5885714285714285,
+        "Verdaderos negativos": 62,
+        "Falsos positivos": 43,
+        "Falsos negativos": 2,
+        "Verdaderos positivos": 3
+    },
+    "categorias_disponibles": {
+        "posicionamiento_salarial": [
+            "Entre el medio y el punto máximo de la banda",
+            "Entre el punto mínimo y el punto medio de la banda",
+            "Por debajo del mínimo de la banda",
+            "Por encima del máximo de la banda"
+        ],
+        "evaluacion_global": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "Sin Evaluación"
+        ],
+        "movilidad_funcional_sn": [
+            "No",
+            "Sí"
+        ],
+        "tipo_contrato": [
+            "Fijo",
+            "Temporal"
+        ]
+    },
+    "umbrales_riesgo": {
+        "bajo": "< 0.35",
+        "medio": "0.35 - 0.55",
+        "alto": ">= 0.55"
+    },
+    "nota_etica": "El modelo es una herramienta de apoyo para Recursos Humanos. No debe utilizarse para decisiones automáticas sobre empleados."
+}

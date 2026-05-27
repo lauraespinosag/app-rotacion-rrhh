@@ -1,0 +1,2 @@
+﻿Accuracy,Precisión,Sensibilidad / Recall,Especificidad,F1-score,AUC ROC,Verdaderos negativos,Falsos positivos,Falsos negativos,Verdaderos positivos
+0.5909090909090909,0.06521739130434782,0.6,0.5904761904761905,0.11764705882352941,0.5885714285714285,62,43,2,3
