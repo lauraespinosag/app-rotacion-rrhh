@@ -18,7 +18,7 @@ st.set_page_config(
 )
 
 BASE_DIR = Path(__file__).parent
-RESULTS_DIR = BASE_DIR / "resultados_modelo_rotacion"
+RESULTS_DIR = BASE_DIR / "resultados modelo rotacion"
 
 MODEL_PATH = RESULTS_DIR / "modelo_rotacion.pkl"
 SCALER_PATH = RESULTS_DIR / "scaler_rotacion.pkl"
