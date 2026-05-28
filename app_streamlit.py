@@ -73,6 +73,23 @@ variables_modelo = [
 
 
 # ============================================================
+# UMBRALES USADOS EN COLAB
+# ============================================================
+
+# Estos umbrales son los mismos que se definieron en Google Colab:
+# Bajo: < 35 %
+# Medio: 35 % - 55 %
+# Alto: >= 55 %
+
+UMBRAL_SEGUIMIENTO = 35
+UMBRAL_PRIORIDAD_ALTA = 55
+
+ESTADO_ALTA = "🔴 Prioridad alta"
+ESTADO_SEGUIMIENTO = "🟡 Requiere seguimiento"
+ESTADO_SIN_ALERTA = "🟢 Sin alerta"
+
+
+# ============================================================
 # FUNCIONES DEL MODELO
 # ============================================================
 
@@ -89,12 +106,12 @@ def predecir_probabilidad(df_input):
 
 
 def clasificar_estado(probabilidad_pct):
-    if probabilidad_pct >= 55:
-        return "🔴 Prioridad alta"
-    elif probabilidad_pct >= 35:
-        return "🟡 Requiere seguimiento"
+    if probabilidad_pct >= UMBRAL_PRIORIDAD_ALTA:
+        return ESTADO_ALTA
+    elif probabilidad_pct >= UMBRAL_SEGUIMIENTO:
+        return ESTADO_SEGUIMIENTO
     else:
-        return "🟢 Sin alerta"
+        return ESTADO_SIN_ALERTA
 
 
 def calcular_riesgo_dataset(df_base):
@@ -108,13 +125,13 @@ def calcular_riesgo_dataset(df_base):
 def resumen_estados(df_pred):
     total = len(df_pred)
 
-    extremos = int((df_pred["estado"] == "🔴 Riesgo extremo").sum())
-    seguimiento = int((df_pred["estado"] == "🟡 Requiere seguimiento").sum())
-    sin_alerta = int((df_pred["estado"] == "🟢 Sin alerta").sum())
+    prioridad_alta = int((df_pred["estado"] == ESTADO_ALTA).sum())
+    seguimiento = int((df_pred["estado"] == ESTADO_SEGUIMIENTO).sum())
+    sin_alerta = int((df_pred["estado"] == ESTADO_SIN_ALERTA).sum())
 
     return {
         "total": total,
-        "extremos": extremos,
+        "prioridad_alta": prioridad_alta,
         "seguimiento": seguimiento,
         "sin_alerta": sin_alerta
     }
@@ -140,21 +157,21 @@ def resumen_por_colectivo(df_pred, variable):
         .groupby(variable)
         .agg(
             empleados=(variable, "count"),
-            riesgo_extremo=("estado", lambda x: (x == "🔴 Riesgo extremo").sum()),
-            seguimiento=("estado", lambda x: (x == "🟡 Requiere seguimiento").sum()),
-            sin_alerta=("estado", lambda x: (x == "🟢 Sin alerta").sum())
+            prioridad_alta=("estado", lambda x: (x == ESTADO_ALTA).sum()),
+            seguimiento=("estado", lambda x: (x == ESTADO_SEGUIMIENTO).sum()),
+            sin_alerta=("estado", lambda x: (x == ESTADO_SIN_ALERTA).sum())
         )
         .reset_index()
     )
 
-    resumen["casos_a_revisar"] = resumen["riesgo_extremo"] + resumen["seguimiento"]
+    resumen["casos_a_revisar"] = resumen["prioridad_alta"] + resumen["seguimiento"]
 
     resumen["% a revisar"] = (
         resumen["casos_a_revisar"] / resumen["empleados"] * 100
     )
 
     resumen = resumen.sort_values(
-        ["riesgo_extremo", "seguimiento", "% a revisar"],
+        ["prioridad_alta", "seguimiento", "% a revisar"],
         ascending=False
     )
 
@@ -183,19 +200,19 @@ def tabla_comparacion(actual, simulado):
 
     datos = pd.DataFrame([
         {
-            "Estado": "🔴 Riesgo extremo",
-            "Situación actual": actual_res["extremos"],
-            "Tras modificar la variable": sim_res["extremos"],
-            "Diferencia": sim_res["extremos"] - actual_res["extremos"]
+            "Estado": ESTADO_ALTA,
+            "Situación actual": actual_res["prioridad_alta"],
+            "Tras modificar la variable": sim_res["prioridad_alta"],
+            "Diferencia": sim_res["prioridad_alta"] - actual_res["prioridad_alta"]
         },
         {
-            "Estado": "🟡 Requiere seguimiento",
+            "Estado": ESTADO_SEGUIMIENTO,
             "Situación actual": actual_res["seguimiento"],
             "Tras modificar la variable": sim_res["seguimiento"],
             "Diferencia": sim_res["seguimiento"] - actual_res["seguimiento"]
         },
         {
-            "Estado": "🟢 Sin alerta",
+            "Estado": ESTADO_SIN_ALERTA,
             "Situación actual": actual_res["sin_alerta"],
             "Tras modificar la variable": sim_res["sin_alerta"],
             "Diferencia": sim_res["sin_alerta"] - actual_res["sin_alerta"]
@@ -220,7 +237,7 @@ resumen_global = resumen_estados(df_pred)
 st.title("App de apoyo a RRHH: rotación voluntaria")
 
 st.write(
-    "Herramienta sencilla para ver cuántos perfiles están en riesgo extremo, "
+    "Herramienta sencilla para ver cuántos perfiles aparecen como prioridad alta, "
     "cuántos requieren seguimiento y cómo cambiaría la estimación del modelo "
     "si se modificaran algunas variables organizacionales."
 )
@@ -256,16 +273,16 @@ with tab1:
     col1, col2, col3, col4 = st.columns(4)
 
     col1.metric("Empleados analizados", resumen_global["total"])
-    col2.metric("🔴 Riesgo extremo", resumen_global["extremos"])
+    col2.metric("🔴 Prioridad alta", resumen_global["prioridad_alta"])
     col3.metric("🟡 Requiere seguimiento", resumen_global["seguimiento"])
     col4.metric("🟢 Sin alerta", resumen_global["sin_alerta"])
 
     st.markdown("### Distribución de estados")
 
     distribucion = pd.DataFrame([
-        {"Estado": "🔴 Riesgo extremo", "Casos": resumen_global["extremos"]},
-        {"Estado": "🟡 Requiere seguimiento", "Casos": resumen_global["seguimiento"]},
-        {"Estado": "🟢 Sin alerta", "Casos": resumen_global["sin_alerta"]}
+        {"Estado": ESTADO_ALTA, "Casos": resumen_global["prioridad_alta"]},
+        {"Estado": ESTADO_SEGUIMIENTO, "Casos": resumen_global["seguimiento"]},
+        {"Estado": ESTADO_SIN_ALERTA, "Casos": resumen_global["sin_alerta"]}
     ])
 
     fig = px.pie(
@@ -275,9 +292,9 @@ with tab1:
         hole=0.45,
         color="Estado",
         color_discrete_map={
-            "🔴 Riesgo extremo": "#D9534F",
-            "🟡 Requiere seguimiento": "#F2B705",
-            "🟢 Sin alerta": "#4CAF50"
+            ESTADO_ALTA: "#D9534F",
+            ESTADO_SEGUIMIENTO: "#F2B705",
+            ESTADO_SIN_ALERTA: "#4CAF50"
         },
         title="Distribución global de perfiles"
     )
@@ -287,7 +304,7 @@ with tab1:
     st.markdown("### Lectura sencilla")
 
     st.info(
-        f"El modelo clasifica {resumen_global['extremos']} casos como riesgo extremo "
+        f"El modelo clasifica {resumen_global['prioridad_alta']} casos como prioridad alta "
         f"y {resumen_global['seguimiento']} como casos que requieren seguimiento. "
         f"Estos grupos son los que conviene observar con mayor detalle en las siguientes pestañas."
     )
@@ -301,7 +318,7 @@ with tab2:
     st.subheader("Colectivos de riesgo")
 
     st.write(
-        "Esta pestaña permite ver en qué colectivos se concentran más casos en riesgo extremo "
+        "Esta pestaña permite ver en qué colectivos se concentran más casos en prioridad alta "
         "o que requieren seguimiento."
     )
 
@@ -341,23 +358,23 @@ with tab2:
 
     col1, col2, col3 = st.columns(3)
 
-    col1.metric("Colectivo con más casos extremos", str(top[variable]))
-    col2.metric("Casos en riesgo extremo", int(top["riesgo_extremo"]))
+    col1.metric("Colectivo con más casos en prioridad alta", str(top[variable]))
+    col2.metric("Casos en prioridad alta", int(top["prioridad_alta"]))
     col3.metric("Casos a revisar", int(top["casos_a_revisar"]))
 
     st.markdown("### Visualización por colectivo")
 
     resumen_grafico = resumen.melt(
         id_vars=[variable],
-        value_vars=["riesgo_extremo", "seguimiento", "sin_alerta"],
+        value_vars=["prioridad_alta", "seguimiento", "sin_alerta"],
         var_name="Estado",
         value_name="Casos"
     )
 
     resumen_grafico["Estado"] = resumen_grafico["Estado"].replace({
-        "riesgo_extremo": "🔴 Riesgo extremo",
-        "seguimiento": "🟡 Requiere seguimiento",
-        "sin_alerta": "🟢 Sin alerta"
+        "prioridad_alta": ESTADO_ALTA,
+        "seguimiento": ESTADO_SEGUIMIENTO,
+        "sin_alerta": ESTADO_SIN_ALERTA
     })
 
     fig = px.bar(
@@ -367,9 +384,9 @@ with tab2:
         color="Estado",
         orientation="h",
         color_discrete_map={
-            "🔴 Riesgo extremo": "#D9534F",
-            "🟡 Requiere seguimiento": "#F2B705",
-            "🟢 Sin alerta": "#4CAF50"
+            ESTADO_ALTA: "#D9534F",
+            ESTADO_SEGUIMIENTO: "#F2B705",
+            ESTADO_SIN_ALERTA: "#4CAF50"
         },
         title=f"Casos por estado según {nombres.get(variable, variable)}"
     )
@@ -388,7 +405,7 @@ with tab2:
     tabla = resumen[[
         variable,
         "empleados",
-        "riesgo_extremo",
+        "prioridad_alta",
         "seguimiento",
         "sin_alerta",
         "casos_a_revisar"
@@ -397,7 +414,7 @@ with tab2:
     tabla = tabla.rename(columns={
         variable: "Colectivo",
         "empleados": "Total empleados",
-        "riesgo_extremo": "🔴 Riesgo extremo",
+        "prioridad_alta": "🔴 Prioridad alta",
         "seguimiento": "🟡 Seguimiento",
         "sin_alerta": "🟢 Sin alerta",
         "casos_a_revisar": "Total a revisar"
@@ -471,15 +488,17 @@ with tab3:
     col1, col2, col3 = st.columns(3)
 
     col1.metric(
-        "🔴 Riesgo extremo",
-        sim_res["extremos"],
-        delta=sim_res["extremos"] - actual_res["extremos"]
+        "🔴 Prioridad alta",
+        sim_res["prioridad_alta"],
+        delta=sim_res["prioridad_alta"] - actual_res["prioridad_alta"],
+        delta_color="inverse"
     )
 
     col2.metric(
         "🟡 Requiere seguimiento",
         sim_res["seguimiento"],
-        delta=sim_res["seguimiento"] - actual_res["seguimiento"]
+        delta=sim_res["seguimiento"] - actual_res["seguimiento"],
+        delta_color="inverse"
     )
 
     col3.metric(
@@ -488,23 +507,24 @@ with tab3:
         delta=sim_res["sin_alerta"] - actual_res["sin_alerta"]
     )
 
-    diferencia_extremos = actual_res["extremos"] - sim_res["extremos"]
+    diferencia_prioridad_alta = actual_res["prioridad_alta"] - sim_res["prioridad_alta"]
+
     diferencia_revision = (
-        (actual_res["extremos"] + actual_res["seguimiento"]) -
-        (sim_res["extremos"] + sim_res["seguimiento"])
+        (actual_res["prioridad_alta"] + actual_res["seguimiento"]) -
+        (sim_res["prioridad_alta"] + sim_res["seguimiento"])
     )
 
-    if diferencia_extremos > 0:
+    if diferencia_prioridad_alta > 0:
         st.success(
-            f"Según el modelo, al modificar esta variable habría {diferencia_extremos} casos menos en riesgo extremo."
+            f"Según el modelo, al modificar esta variable habría {diferencia_prioridad_alta} casos menos en prioridad alta."
         )
-    elif diferencia_extremos == 0:
+    elif diferencia_prioridad_alta == 0:
         st.info(
-            "Según el modelo, esta modificación no reduce los casos en riesgo extremo."
+            "Según el modelo, esta modificación no reduce los casos en prioridad alta."
         )
     else:
         st.warning(
-            "Según el modelo, esta modificación aumentaría los casos en riesgo extremo."
+            "Según el modelo, esta modificación aumentaría los casos en prioridad alta."
         )
 
     if diferencia_revision > 0:
