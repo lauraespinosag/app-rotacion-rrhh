@@ -89,9 +89,9 @@ def predecir_probabilidad(df_input):
 
 
 def clasificar_estado(probabilidad_pct):
-    if probabilidad_pct >= 55:
-        return "🔴 Riesgo extremo"
-    elif probabilidad_pct >= 35:
+    if probabilidad_pct >= 75:
+        return "🔴 Prioridad alta"
+    elif probabilidad_pct >= 55:
         return "🟡 Requiere seguimiento"
     else:
         return "🟢 Sin alerta"
