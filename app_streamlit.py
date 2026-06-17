@@ -83,10 +83,14 @@ archivo_subido = st.sidebar.file_uploader(
 
 
 def leer_dataset_subido(archivo):
-    if archivo.name.endswith(".csv"):
+    nombre = archivo.name.lower()
+
+    if nombre.endswith(".csv"):
         return pd.read_csv(archivo)
-    elif archivo.name.endswith(".xlsx"):
-        return pd.read_excel(archivo)
+
+    elif nombre.endswith(".xlsx"):
+        return pd.read_excel(archivo, engine="openpyxl")
+
     else:
         st.error("Formato no compatible. Sube un archivo CSV o Excel.")
         st.stop()
