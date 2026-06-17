@@ -1,5 +1,6 @@
 {
     "objetivo": "Predicción orientativa de rotación voluntaria en perfiles tecnológicos",
+    "tipo_datos": "Muestra sintética complementaria basada en la estructura de la base original",
     "modelo": "Regresión logística",
     "variables_modelo": [
         "antiguedad_anios",
@@ -13,7 +14,6 @@
         "posicionamiento_salarial_Entre el punto mínimo y el punto medio de la banda",
         "posicionamiento_salarial_Por debajo del mínimo de la banda",
         "posicionamiento_salarial_Por encima del máximo de la banda",
-        "evaluacion_global_2",
         "evaluacion_global_3",
         "evaluacion_global_4",
         "evaluacion_global_5",
@@ -21,17 +21,19 @@
         "movilidad_funcional_sn_Sí",
         "tipo_contrato_Temporal"
     ],
+    "umbral_modelo_principal": 0.6,
     "metricas": {
-        "Accuracy": 0.5909090909090909,
-        "Precisión": 0.06521739130434782,
-        "Sensibilidad / Recall": 0.6,
-        "Especificidad": 0.5904761904761905,
-        "F1-score": 0.11764705882352941,
-        "AUC ROC": 0.5885714285714285,
-        "Verdaderos negativos": 62,
-        "Falsos positivos": 43,
-        "Falsos negativos": 2,
-        "Verdaderos positivos": 3
+        "Umbral usado": 0.6,
+        "Accuracy": 0.8454545454545455,
+        "Precisión": 0.7105263157894737,
+        "Sensibilidad / Recall": 0.8181818181818182,
+        "Especificidad": 0.8571428571428571,
+        "F1-score": 0.7605633802816901,
+        "AUC ROC": 0.9090909090909091,
+        "Verdaderos negativos": 66,
+        "Falsos positivos": 11,
+        "Falsos negativos": 6,
+        "Verdaderos positivos": 27
     },
     "categorias_disponibles": {
         "posicionamiento_salarial": [
@@ -41,7 +43,6 @@
             "Por encima del máximo de la banda"
         ],
         "evaluacion_global": [
-            "1",
             "2",
             "3",
             "4",
@@ -58,9 +59,9 @@
         ]
     },
     "umbrales_riesgo": {
-        "bajo": "< 0.35",
-        "medio": "0.35 - 0.55",
-        "alto": ">= 0.55"
+        "sin_alerta": "< 0.40",
+        "seguimiento": "0.40 - 0.60",
+        "prioridad_alta": ">= 0.60"
     },
-    "nota_etica": "El modelo es una herramienta de apoyo para Recursos Humanos. No debe utilizarse para decisiones automáticas sobre empleados."
+    "nota_etica": "El modelo es una herramienta de apoyo para Recursos Humanos. No debe utilizarse para decisiones automáticas sobre empleados. La muestra sintética se utiliza como ejercicio metodológico complementario."
 }

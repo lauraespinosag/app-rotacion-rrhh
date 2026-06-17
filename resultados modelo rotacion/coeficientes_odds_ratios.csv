@@ -1,0 +1,11 @@
+﻿Variable,Coeficiente,Odds_Ratio,Importancia,Interpretacion
+antiguedad_anios,-1.8563424827828299,0.15624304821446394,1.8563424827828299,Reduce probabilidad estimada de rotación
+movilidad_funcional_sn_Sí,-1.2884075361153131,0.27570949109094467,1.2884075361153131,Reduce probabilidad estimada de rotación
+evaluacion_global_5,-1.2822793985491838,0.2774042643787635,1.2822793985491838,Reduce probabilidad estimada de rotación
+posicionamiento_salarial_Por encima del máximo de la banda,-1.0003354406029386,0.36775606016454365,1.0003354406029386,Reduce probabilidad estimada de rotación
+evaluacion_global_4,-0.9710144961427031,0.37869865483411813,0.9710144961427031,Reduce probabilidad estimada de rotación
+posicionamiento_salarial_Por debajo del mínimo de la banda,0.9062602360756755,2.475049104623297,0.9062602360756755,Aumenta probabilidad estimada de rotación
+evaluacion_global_3,-0.7718123943495235,0.46217466602974083,0.7718123943495235,Reduce probabilidad estimada de rotación
+posicionamiento_salarial_Entre el punto mínimo y el punto medio de la banda,0.7001919879312096,2.0141393608019507,0.7001919879312096,Aumenta probabilidad estimada de rotación
+tipo_contrato_Temporal,0.5888606914491439,1.8019342863361434,0.5888606914491439,Aumenta probabilidad estimada de rotación
+evaluacion_global_Sin Evaluación,-0.07303674795306535,0.9295666697257858,0.07303674795306535,Reduce probabilidad estimada de rotación
