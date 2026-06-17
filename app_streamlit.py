@@ -56,7 +56,6 @@ def cargar_dataset():
 
 
 modelo, scaler, columnas_modelo, metadata = cargar_modelo()
-df = cargar_dataset()
 
 st.caption(f"Versión cargada: {APP_VERSION}")
 st.caption(f"Carpeta de modelo cargada: {RESULTS_DIR}")
@@ -74,6 +73,84 @@ variables_modelo = metadata.get(
         "tipo_contrato"
     ]
 )
+
+st.sidebar.header("Carga de datos")
+
+archivo_subido = st.sidebar.file_uploader(
+    "Sube un dataset para evaluarlo",
+    type=["csv", "xlsx"]
+)
+
+
+def leer_dataset_subido(archivo):
+    if archivo.name.endswith(".csv"):
+        return pd.read_csv(archivo)
+    elif archivo.name.endswith(".xlsx"):
+        return pd.read_excel(archivo)
+    else:
+        st.error("Formato no compatible. Sube un archivo CSV o Excel.")
+        st.stop()
+
+
+def preparar_dataset_usuario(df_usuario):
+    df_usuario = df_usuario.copy()
+
+    columnas_faltantes = [
+        col for col in variables_modelo
+        if col not in df_usuario.columns
+    ]
+
+    if columnas_faltantes:
+        st.error(
+            "El dataset subido no tiene todas las columnas necesarias para aplicar el modelo."
+        )
+        st.write("Columnas que faltan:")
+        st.write(columnas_faltantes)
+
+        st.write("Columnas obligatorias:")
+        st.write(variables_modelo)
+
+        st.stop()
+
+    df_usuario["antiguedad_anios"] = pd.to_numeric(
+        df_usuario["antiguedad_anios"],
+        errors="coerce"
+    )
+
+    for col in [
+        "posicionamiento_salarial",
+        "evaluacion_global",
+        "movilidad_funcional_sn",
+        "tipo_contrato"
+    ]:
+        df_usuario[col] = df_usuario[col].astype(str)
+
+    if "tramo_antiguedad" not in df_usuario.columns:
+        df_usuario["tramo_antiguedad"] = pd.cut(
+            df_usuario["antiguedad_anios"],
+            bins=[-1, 1, 3, 7, 15, 100],
+            labels=[
+                "0-1 años",
+                "1-3 años",
+                "4-7 años",
+                "8-15 años",
+                "Más de 15 años"
+            ]
+        ).astype(str)
+
+    return df_usuario
+
+
+if archivo_subido is not None:
+    df = leer_dataset_subido(archivo_subido)
+    df = preparar_dataset_usuario(df)
+
+    st.sidebar.success("Dataset subido correctamente.")
+    st.sidebar.write(f"Registros cargados: {len(df)}")
+
+else:
+    df = cargar_dataset()
+    st.sidebar.info("Usando dataset de ejemplo guardado en la app.")
 # ============================================================
 # UMBRALES USADOS EN COLAB
 # ============================================================
