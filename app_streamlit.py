@@ -31,6 +31,8 @@ COLUMNS_PATH = RESULTS_DIR / "columnas_modelo.pkl"
 METADATA_PATH = RESULTS_DIR / "metadata_modelo.json"
 DATASET_PATH = RESULTS_DIR / "dataset_app_streamlit.csv"
 
+APP_VERSION = "modelo_sintetico_umbral_060_v2"
+
 
 # ============================================================
 # CARGA DE ARCHIVOS
@@ -49,12 +51,16 @@ def cargar_modelo():
 
 
 @st.cache_data
-def cargar_dataset():
+def cargar_dataset(app_version):
     return pd.read_csv(DATASET_PATH)
 
 
-modelo, scaler, columnas_modelo, metadata = cargar_modelo()
-df = cargar_dataset()
+modelo, scaler, columnas_modelo, metadata = cargar_modelo(APP_VERSION)
+df = cargar_dataset(APP_VERSION)
+
+st.caption(f"Versión cargada: {APP_VERSION}")
+st.caption(f"Carpeta de modelo cargada: {RESULTS_DIR}")
+st.caption(f"Umbral principal cargado: {metadata.get('umbral_modelo_principal')}")
 
 categorias = metadata["categorias_disponibles"]
 
