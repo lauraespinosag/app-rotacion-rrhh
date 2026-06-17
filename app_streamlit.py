@@ -62,7 +62,18 @@ st.caption(f"Versión cargada: {APP_VERSION}")
 st.caption(f"Carpeta de modelo cargada: {RESULTS_DIR}")
 st.caption(f"Umbral principal cargado: {metadata.get('umbral_modelo_principal')}")
 
+categorias = metadata.get("categorias_disponibles", {})
 
+variables_modelo = metadata.get(
+    "variables_modelo",
+    [
+        "antiguedad_anios",
+        "posicionamiento_salarial",
+        "evaluacion_global",
+        "movilidad_funcional_sn",
+        "tipo_contrato"
+    ]
+)
 # ============================================================
 # UMBRALES USADOS EN COLAB
 # ============================================================
