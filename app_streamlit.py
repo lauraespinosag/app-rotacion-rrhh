@@ -77,9 +77,9 @@ variables_modelo = [
 # ============================================================
 
 # Estos umbrales son los mismos que se definieron en Google Colab:
-# Bajo: < 35 %
-# Medio: 35 % - 55 %
-# Alto: >= 55 %
+# Bajo: < 40 %
+# Medio: 40 % - 60 %
+# Alto: >= 60 %
 
 UMBRAL_SEGUIMIENTO = 40
 UMBRAL_PRIORIDAD_ALTA = 60
