@@ -38,7 +38,8 @@ APP_VERSION = "modelo_sintetico_umbral_060_v2"
 # CARGA DE ARCHIVOS
 # ============================================================
 
-@st.cache_resource
+APP_VERSION = "modelo_sintetico_umbral_060_v4"
+
 def cargar_modelo():
     modelo = joblib.load(MODEL_PATH)
     scaler = joblib.load(SCALER_PATH)
@@ -50,27 +51,16 @@ def cargar_modelo():
     return modelo, scaler, columnas_modelo, metadata
 
 
-@st.cache_data
-def cargar_dataset(app_version):
+def cargar_dataset():
     return pd.read_csv(DATASET_PATH)
 
 
-modelo, scaler, columnas_modelo, metadata = cargar_modelo(APP_VERSION)
-df = cargar_dataset(APP_VERSION)
+modelo, scaler, columnas_modelo, metadata = cargar_modelo()
+df = cargar_dataset()
 
 st.caption(f"Versión cargada: {APP_VERSION}")
 st.caption(f"Carpeta de modelo cargada: {RESULTS_DIR}")
 st.caption(f"Umbral principal cargado: {metadata.get('umbral_modelo_principal')}")
-
-categorias = metadata["categorias_disponibles"]
-
-variables_modelo = [
-    "antiguedad_anios",
-    "posicionamiento_salarial",
-    "evaluacion_global",
-    "movilidad_funcional_sn",
-    "tipo_contrato"
-]
 
 
 # ============================================================
