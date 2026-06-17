@@ -23,12 +23,7 @@ st.set_page_config(
 # ============================================================
 
 BASE_DIR = Path(__file__).parent
-
-# Detecta automáticamente si la carpeta está con guiones bajos o espacios
-if (BASE_DIR / "resultados modelo rotacion").exists():
-    RESULTS_DIR = BASE_DIR / "resultados modelo rotacion"
-else:
-    RESULTS_DIR = BASE_DIR / "resultados modelo rotacion"
+RESULTS_DIR = BASE_DIR / "resultados modelo rotacion"
 
 MODEL_PATH = RESULTS_DIR / "modelo_rotacion.pkl"
 SCALER_PATH = RESULTS_DIR / "scaler_rotacion.pkl"
