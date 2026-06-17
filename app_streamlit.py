@@ -81,8 +81,8 @@ variables_modelo = [
 # Medio: 35 % - 55 %
 # Alto: >= 55 %
 
-UMBRAL_SEGUIMIENTO = 35
-UMBRAL_PRIORIDAD_ALTA = 55
+UMBRAL_SEGUIMIENTO = 40
+UMBRAL_PRIORIDAD_ALTA = 60
 
 ESTADO_ALTA = "🔴 Prioridad alta"
 ESTADO_SEGUIMIENTO = "🟡 Requiere seguimiento"
